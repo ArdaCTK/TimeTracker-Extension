@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Pro Time Tracker - Analytics</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="assets/chart.umd.js"></script>
+</head>
+
+<body class="report-body">
+    <div class="container">
+        <div class="header-text">
+            <h1>Analytics Dashboard</h1>
+            <input type="date" id="dateSelector" class="date-picker">
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card stat-card">
+                <h3>Total Active Time</h3>
+                <b id="totalTime" class="text-primary">0s</b>
+            </div>
+            <div class="card chart-card">
+                <canvas id="usageChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Domain / Sub-paths</th>
+                        <th style="text-align: right;">Time Spent</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script src="report.js"></script>
+</body>
+
+</html>
