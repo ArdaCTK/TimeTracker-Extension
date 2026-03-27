@@ -70,9 +70,12 @@ function renderDashboard(data) {
             <td>
                 <details>
                     <summary>
-                        <div class="url-text">
-                            <img src="${iconUrl}" class="favicon" onerror="this.src='assets/icon-16.png'">
-                            <strong>${domain}</strong>
+                        <div class="domain-wrapper">
+                            <div class="domain-left">
+                                <img src="${iconUrl}" class="favicon" onerror="this.src='assets/icon-16.png'">
+                                <strong>${domain}</strong>
+                            </div>
+                            <div class="details-icon"></div>
                         </div>
                     </summary>
                     <div class="sub-paths-container">

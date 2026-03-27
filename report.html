@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Pro Time Tracker - Analytics</title>
+    <title>Pro Time Tracker - Analytics Dashboard</title>
     <link rel="stylesheet" href="style.css">
     <script src="assets/chart.umd.js"></script>
 </head>
@@ -12,28 +12,34 @@
     <div class="container">
         <div class="header-text">
             <h1>Analytics Dashboard</h1>
-            <input type="date" id="dateSelector" class="date-picker">
+            <div class="header-right">
+                <input type="date" id="dateSelector" class="date-picker">
+            </div>
         </div>
 
         <div class="dashboard-grid">
             <div class="card stat-card">
                 <h3>Total Active Time</h3>
-                <b id="totalTime" class="text-primary">0s</b>
+                <div id="totalTime" class="total-time-value">0s</div>
+                <div class="stat-desc">Total tracked hours today</div>
             </div>
             <div class="card chart-card">
                 <canvas id="usageChart"></canvas>
             </div>
         </div>
 
-        <div class="card">
+        <div class="card table-card">
             <table class="report-table">
                 <thead>
                     <tr>
                         <th>Domain / Sub-paths</th>
-                        <th style="text-align: right;">Time Spent</th>
+                        <th style="text-align: right; width: 120px;">Time Spent</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
+                    <tr>
+                        <td colspan="2" class="empty-state">No data recorded for this date.</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
