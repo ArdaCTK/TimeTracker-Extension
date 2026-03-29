@@ -5,25 +5,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
+    <title>Pro Time Tracker</title>
 </head>
 
 <body class="popup-body">
     <div class="card">
         <div class="header">
             <div class="header-left">
-                <h2>Time Tracker</h2>
-                <div class="status-dot"></div>
+                <h2>Pro Time Tracker</h2>
+                <div id="trackingStatus" class="status-dot active"></div>
             </div>
         </div>
+
+        <div id="todayStats" class="today-stats">
+            <div class="stat-item">
+                <span class="stat-label">Today</span>
+                <span id="todayTotal" class="stat-value">0s</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Active</span>
+                <span id="currentTab" class="stat-value">—</span>
+            </div>
+        </div>
+
         <div class="input-group">
             <label for="reportTime">Daily Notification Time</label>
             <input type="time" id="reportTime">
         </div>
+
         <button id="saveBtn" class="btn-primary">Save Time</button>
         <button id="viewReportBtn" class="btn-secondary">Open Dashboard</button>
-        <div id="status"></div>
+        <div id="status" class="status-message"></div>
     </div>
-    <script src="popup.js"></script>
+    <script src="popup.js" type="module"></script>
 </body>
 
 </html>

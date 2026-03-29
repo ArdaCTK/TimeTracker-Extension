@@ -20,11 +20,12 @@
         <div class="dashboard-grid">
             <div class="card stat-card">
                 <h3>Total Active Time</h3>
-                <div id="totalTime" class="total-time-value">0s</div>
+                <div id="totalTime" class="total-time-value">—</div>
                 <div class="stat-desc">Total tracked hours today</div>
             </div>
             <div class="card chart-card">
                 <canvas id="usageChart"></canvas>
+                <div id="chartLoader" class="loader"></div>
             </div>
         </div>
 
@@ -38,13 +39,13 @@
                 </thead>
                 <tbody id="tableBody">
                     <tr>
-                        <td colspan="2" class="empty-state">No data recorded for this date.</td>
+                        <td colspan="2" class="empty-state">Loading…</td>
                     </tr>
                 </tbody>
             </table>
         </div>
     </div>
-    <script src="report.js"></script>
+    <script src="report.js" type="module"></script>
 </body>
 
 </html>

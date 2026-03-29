@@ -2,17 +2,20 @@
     "manifest_version": 3,
     "name": "Pro Time Tracker",
     "description": "Track your active browser time, analyze domain usage, and boost your productivity with detailed local insights.",
-    "version": "2.0.0",
+    "version": "3.0.0",
     "permissions": [
         "tabs",
         "storage",
         "alarms",
-        "favicon",
         "notifications",
         "idle"
     ],
+    "host_permissions": [
+        "<all_urls>"
+    ],
     "background": {
-        "service_worker": "background.js"
+        "service_worker": "background.js",
+        "type": "module"
     },
     "action": {
         "default_popup": "popup.html"
