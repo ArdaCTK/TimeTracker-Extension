@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pro Time Tracker — Settings</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="report-body">
+<div class="report-root">
+
+  <!-- Header -->
+  <header class="report-header">
+    <a href="report.html" class="back-link">← Dashboard</a>
+    <span class="settings-header-title">Settings</span>
+    <div></div>
+  </header>
+
+  <main class="report-main settings-main">
+
+    <!-- ── Domain Categories & Limits ────────────────────────────────────────── -->
+    <div class="settings-card">
+      <div class="settings-card-header">
+        <div class="settings-card-title">Domain Categories &amp; Time Limits</div>
+        <div class="settings-card-desc">
+          Tag domains to measure productive vs. unproductive time. Set daily limits to receive notifications.
+        </div>
+      </div>
+      <div class="settings-table">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width:auto">Domain</th>
+              <th style="width:140px">Category</th>
+              <th style="width:160px">Daily Limit</th>
+              <th style="width:70px"></th>
+            </tr>
+          </thead>
+          <tbody id="categoryBody">
+            <tr>
+              <td colspan="4" class="empty-state">
+                No domains tracked yet. Browse the web for a bit first.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Data Management ───────────────────────────────────────────────────── -->
+    <div class="settings-card">
+      <div class="settings-card-header">
+        <div class="settings-card-title">Data Management</div>
+        <div class="settings-card-desc">All data is stored locally in your browser. Nothing is sent to any server.</div>
+      </div>
+
+      <div class="data-row-item">
+        <div>
+          <div class="data-row-label">Export all data</div>
+          <div class="data-row-desc">Download your complete tracking history as a JSON file.</div>
+        </div>
+        <button class="btn-outline" id="exportJsonBtn">Export JSON</button>
+      </div>
+
+      <div class="data-row-item">
+        <div>
+          <div class="data-row-label">Export current month</div>
+          <div class="data-row-desc">Download only this month's data as CSV.</div>
+        </div>
+        <button class="btn-outline" id="exportMonthBtn">Export CSV</button>
+      </div>
+
+      <div class="data-row-item">
+        <div>
+          <div class="data-row-label danger">Clear all tracking data</div>
+          <div class="data-row-desc">Permanently deletes all recorded time. Settings are kept.</div>
+        </div>
+        <button class="btn-danger" id="clearDataBtn">Clear Data</button>
+      </div>
+    </div>
+
+    <!-- ── About ─────────────────────────────────────────────────────────────── -->
+    <div class="settings-card">
+      <div class="settings-card-header">
+        <div class="settings-card-title">About</div>
+      </div>
+      <div class="data-row-item">
+        <div>
+          <div class="data-row-label">Pro Time Tracker</div>
+          <div class="data-row-desc">Version 3.0.0 · Privacy-first browser time tracking · All data stays on your device.</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+<script src="settings.js"></script>
+</body>
+</html>

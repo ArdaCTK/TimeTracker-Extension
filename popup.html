@@ -1,43 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="style.css">
-    <title>Pro Time Tracker</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pro Time Tracker</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body class="popup-body">
-    <div class="card">
-        <div class="header">
-            <div class="header-left">
-                <h2>Pro Time Tracker</h2>
-                <div id="trackingStatus" class="status-dot active"></div>
-            </div>
-        </div>
+  <div class="popup-root">
 
-        <div id="todayStats" class="today-stats">
-            <div class="stat-item">
-                <span class="stat-label">Today</span>
-                <span id="todayTotal" class="stat-value">0s</span>
-            </div>
-            <div class="stat-item">
-                <span class="stat-label">Active</span>
-                <span id="currentTab" class="stat-value">—</span>
-            </div>
-        </div>
+    <!-- Header -->
+    <header class="popup-header">
+      <div class="popup-wordmark">
+        <div class="popup-wordmark-icon">⏱</div>
+        Time Tracker
+      </div>
+      <div class="status-pill" id="statusPill">
+        <span class="status-dot"></span>
+        <span id="statusLabel">Idle</span>
+      </div>
+    </header>
 
-        <div class="input-group">
-            <label for="reportTime">Daily Notification Time</label>
-            <input type="time" id="reportTime">
-        </div>
-
-        <button id="saveBtn" class="btn-primary">Save Time</button>
-        <button id="viewReportBtn" class="btn-secondary">Open Dashboard</button>
-        <div id="status" class="status-message"></div>
+    <!-- Hero total time -->
+    <div class="popup-hero">
+      <div class="popup-hero-label">Today's active time</div>
+      <div class="popup-hero-time" id="heroTime">—</div>
     </div>
-    <script src="popup.js" type="module"></script>
-</body>
 
+    <!-- Productivity category bar -->
+    <div class="cat-bar">
+      <div class="cat-bar-seg productive"   id="barProductive"   style="width:0%"></div>
+      <div class="cat-bar-seg neutral"      id="barNeutral"      style="width:100%"></div>
+      <div class="cat-bar-seg unproductive" id="barUnproductive" style="width:0%"></div>
+    </div>
+    <div class="cat-legend">
+      <div class="cat-legend-item">
+        <span class="cat-legend-dot productive"></span>Productive
+      </div>
+      <div class="cat-legend-item">
+        <span class="cat-legend-dot neutral"></span>Neutral
+      </div>
+      <div class="cat-legend-item">
+        <span class="cat-legend-dot unproductive"></span>Unproductive
+      </div>
+    </div>
+
+    <!-- Top sites -->
+    <div class="popup-sites">
+      <div class="popup-sites-header">Top Sites</div>
+      <div id="popupSitesList">
+        <div class="popup-empty">No activity recorded today.</div>
+      </div>
+    </div>
+
+    <!-- Currently tracking -->
+    <div class="popup-now" id="popupNow">
+      <span class="popup-now-label">▶ Now</span>
+      <span class="popup-now-domain" id="nowDomain">—</span>
+    </div>
+
+    <hr class="popup-divider">
+
+    <!-- Notification time -->
+    <div class="popup-notify">
+      <span class="popup-notify-label">Daily report at</span>
+      <input type="time" id="reportTime" class="popup-time-input">
+      <button id="saveBtn" class="icon-btn" title="Save notification time">✓</button>
+    </div>
+    <div class="popup-save-feedback" id="saveFeedback"></div>
+
+    <!-- Main actions -->
+    <div class="popup-actions">
+      <button id="viewReportBtn" class="btn-primary">Open Dashboard</button>
+      <button id="settingsBtn"   class="btn-ghost">Settings</button>
+    </div>
+
+  </div>
+  <script src="popup.js"></script>
+</body>
 </html>

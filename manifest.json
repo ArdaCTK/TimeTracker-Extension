@@ -1,23 +1,30 @@
 {
-    "manifest_version": 3,
-    "name": "Pro Time Tracker",
-    "description": "Track your active browser time, analyze domain usage, and boost your productivity with detailed local insights.",
-    "version": "3.0.0",
-    "permissions": [
-        "tabs",
-        "storage",
-        "alarms",
-        "notifications",
-        "idle"
-    ],
-    "host_permissions": [
-        "<all_urls>"
-    ],
-    "background": {
-        "service_worker": "background.js",
-        "type": "module"
-    },
-    "action": {
-        "default_popup": "popup.html"
+  "manifest_version": 3,
+  "name": "Pro Time Tracker",
+  "description": "Track your active browser time with domain analytics, productivity categories, and time limits.",
+  "version": "3.0.0",
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms",
+    "notifications",
+    "idle",
+    "favicon"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "48": "assets/icon-48.png",
+      "128": "assets/icon-128.png"
     }
+  },
+  "icons": {
+    "16": "assets/icon-16.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  }
 }
