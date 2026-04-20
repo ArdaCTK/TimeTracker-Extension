@@ -23,6 +23,6 @@ Built with Vanilla JavaScript, HTML5, and CSS3. Utilizes Manifest V3 APIs (`chro
 ## License
 This project is **Source-Available** for personal use only. 
 
-You are welcome to download the code, inspect how it works, and modify it for your own personal productivity. However, you **may not** distribute the code (modified or unmodified), use it for commercial purposes, sell it, or claim it as your own work. 
+You are welcome to download the code, inspect how it works, and modify it for your own personal productivity. However, you **may not** use it for commercial purposes, sell it, or claim it as your own work. 
 
 See the `LICENSE` file for the exact, binding terms.
