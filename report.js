@@ -1,16 +1,16 @@
-// report.js — Pro Time Tracker v3.0
+// report.js — Pro Time Tracker v3.1
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-let view        = 'day';          // 'day' | 'week'
-let currentDate = new Date();     // The pivot date for the current view
-let mainChart   = null;
+let view = 'day';      // 'day' | 'week' | 'month'
+let currentDate = new Date();
+let mainChart = null;
 
-let snapshotDomains    = {};      // { domain: { total, paths } } for current period
-let snapshotTotalMs    = 0;
+let snapshotDomains = {};
+let snapshotTotalMs = 0;
 let snapshotCategories = {};
 
-// ─── Chart color palette ─────────────────────────────────────────────────────
+// ─── Palette ─────────────────────────────────────────────────────────────────
 
 const PALETTE = [
   '#3d7dff', '#7c5cfc', '#e040fb', '#f06292',
@@ -18,17 +18,16 @@ const PALETTE = [
 ];
 
 function categoryColor(cat) {
-  if (cat === 'productive')   return '#22d3a0';
+  if (cat === 'productive') return '#22d3a0';
   if (cat === 'unproductive') return '#ff5f57';
   return '#6b7280';
 }
 
 function categoryLabel(cat) {
-  const map = { productive: 'Productive', unproductive: 'Unproductive', neutral: 'Neutral' };
-  return map[cat] ?? 'Neutral';
+  return { productive: 'Productive', unproductive: 'Unproductive', neutral: 'Neutral' }[cat] ?? 'Neutral';
 }
 
-// ─── Formatting ───────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtTime(ms) {
   const s = Math.floor(ms / 1000);
@@ -39,28 +38,43 @@ function fmtTime(ms) {
   return `${s}s`;
 }
 
+// FIX: local date, not UTC
 function dateKey(d) {
-  return d.toISOString().split('T')[0];
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// FIX: Monday-based week (EU/TR convention)
 function getWeekStart(d) {
   const copy = new Date(d);
-  copy.setDate(copy.getDate() - copy.getDay()); // Sunday
+  const day = copy.getDay();           // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day; // shift to Monday
+  copy.setDate(copy.getDate() + diff);
   return copy;
 }
 
+// XSS guard
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function formatDateDisplay(d) {
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
   if (view === 'week') {
     const start = getWeekStart(d);
-    const end   = new Date(start);
+    const end = new Date(start);
     end.setDate(end.getDate() + 6);
     const fmt = { month: 'short', day: 'numeric' };
     return `${start.toLocaleDateString('en', fmt)} – ${end.toLocaleDateString('en', fmt)}`;
   }
-  const today     = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  if (dateKey(d) === dateKey(today))     return 'Today';
+  if (view === 'month') {
+    return d.toLocaleDateString('en', { month: 'long', year: 'numeric' });
+  }
+  if (dateKey(d) === dateKey(today)) return 'Today';
   if (dateKey(d) === dateKey(yesterday)) return 'Yesterday';
   return d.toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' });
 }
@@ -72,11 +86,13 @@ async function load() {
   snapshotCategories = categories;
 
   if (view === 'day') {
-    const key    = dateKey(currentDate);
+    const key = dateKey(currentDate);
     const result = await chrome.storage.local.get(key);
     renderDay(result[key] || {});
-  } else {
+  } else if (view === 'week') {
     await loadWeek();
+  } else {
+    await loadMonth();
   }
 
   syncDateDisplay();
@@ -84,43 +100,71 @@ async function load() {
 
 async function loadWeek() {
   const start = getWeekStart(currentDate);
-  const keys  = Array.from({ length: 7 }, (_, i) => {
+  const keys = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
     return dateKey(d);
   });
 
   const result = await chrome.storage.local.get(keys);
-
-  // Build per-day bar data + merged domain totals
-  const dayLabels  = [];
-  const dayTotals  = [];
-  const merged     = {};
+  const labels = [];
+  const totals = [];
+  const merged = {};
 
   for (let i = 0; i < 7; i++) {
-    const d   = new Date(start);
+    const d = new Date(start);
     d.setDate(d.getDate() + i);
-    dayLabels.push(d.toLocaleDateString('en', { weekday: 'short' }));
+    labels.push(d.toLocaleDateString('en', { weekday: 'short' }));
 
     const dayData = result[keys[i]] || {};
     let dayMs = 0;
-
     for (const [domain, data] of Object.entries(dayData)) {
       dayMs += data.total;
-      if (!merged[domain]) merged[domain] = { total: 0, paths: {} };
-      merged[domain].total += data.total;
-      for (const [path, ms] of Object.entries(data.paths || {})) {
-        merged[domain].paths[path] = (merged[domain].paths[path] || 0) + ms;
-      }
+      mergeDomain(merged, domain, data);
     }
-
-    dayTotals.push(Math.round(dayMs / 60000)); // minutes
+    totals.push(Math.round(dayMs / 60000));
   }
 
-  renderWeek(dayLabels, dayTotals, merged);
+  renderPeriod(merged, labels, totals, 'bar');
 }
 
-// ─── Rendering — Day View ─────────────────────────────────────────────────────
+async function loadMonth() {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const days = new Date(year, month + 1, 0).getDate();
+
+  const keys = Array.from({ length: days }, (_, i) =>
+    `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
+  );
+
+  const result = await chrome.storage.local.get(keys);
+  const labels = [];
+  const totals = [];
+  const merged = {};
+
+  for (let i = 0; i < days; i++) {
+    labels.push(String(i + 1));
+    const dayData = result[keys[i]] || {};
+    let dayMs = 0;
+    for (const [domain, data] of Object.entries(dayData)) {
+      dayMs += data.total;
+      mergeDomain(merged, domain, data);
+    }
+    totals.push(Math.round(dayMs / 60000));
+  }
+
+  renderPeriod(merged, labels, totals, 'bar');
+}
+
+function mergeDomain(merged, domain, data) {
+  if (!merged[domain]) merged[domain] = { total: 0, paths: {} };
+  merged[domain].total += data.total;
+  for (const [path, ms] of Object.entries(data.paths || {})) {
+    merged[domain].paths[path] = (merged[domain].paths[path] || 0) + ms;
+  }
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
 
 function renderDay(dayData) {
   const sorted = Object.entries(dayData).sort(([, a], [, b]) => b.total - a.total);
@@ -129,14 +173,12 @@ function renderDay(dayData) {
 
   updateStats(sorted);
 
-  // Doughnut chart
-  const top8   = sorted.slice(0, 8);
+  const top8 = sorted.slice(0, 8);
   const labels = top8.map(([d]) => d);
   const values = top8.map(([, d]) => Math.round(d.total / 60000));
   const colors = top8.map(([d], i) => {
-    const cat = snapshotCategories[d] || 'neutral';
-    if (cat !== 'neutral') return categoryColor(cat);
-    return PALETTE[i % PALETTE.length];
+    const cat = getEffectiveCategory(d, snapshotCategories);
+    return cat !== 'neutral' ? categoryColor(cat) : PALETTE[i % PALETTE.length];
   });
 
   buildDoughnutChart(labels, values, colors);
@@ -144,36 +186,31 @@ function renderDay(dayData) {
   renderTable(sorted);
 }
 
-// ─── Rendering — Week View ────────────────────────────────────────────────────
-
-function renderWeek(dayLabels, dayTotals, merged) {
+function renderPeriod(merged, labels, totals, chartType) {
   snapshotDomains = merged;
   const sorted = Object.entries(merged).sort(([, a], [, b]) => b.total - a.total);
   snapshotTotalMs = sorted.reduce((s, [, d]) => s + d.total, 0);
 
   updateStats(sorted);
-  buildBarChart(dayLabels, dayTotals);
+  buildBarChart(labels, totals);
   renderLegend(sorted);
   renderTable(sorted);
 }
 
-// ─── Stats Row ────────────────────────────────────────────────────────────────
+// ─── Stats ────────────────────────────────────────────────────────────────────
 
 function updateStats(sorted) {
   document.getElementById('statTotal').textContent =
     snapshotTotalMs > 0 ? fmtTime(snapshotTotalMs) : '—';
-
   document.getElementById('statTop').textContent = sorted[0]?.[0] ?? '—';
   document.getElementById('statSites').textContent = sorted.length || '—';
 
   const prodMs = sorted
-    .filter(([d]) => snapshotCategories[d] === 'productive')
+    .filter(([d]) => getEffectiveCategory(d, snapshotCategories) === 'productive')
     .reduce((s, [, v]) => s + v.total, 0);
 
-  const pct = snapshotTotalMs > 0
-    ? `${Math.round((prodMs / snapshotTotalMs) * 100)}%`
-    : '—';
-  document.getElementById('statProductive').textContent = pct;
+  document.getElementById('statProductive').textContent =
+    snapshotTotalMs > 0 ? `${Math.round((prodMs / snapshotTotalMs) * 100)}%` : '—';
 }
 
 // ─── Charts ───────────────────────────────────────────────────────────────────
@@ -187,29 +224,16 @@ function buildDoughnutChart(labels, values, colors) {
     type: 'doughnut',
     data: {
       labels,
-      datasets: [{
-        data: values,
-        backgroundColor: colors,
-        borderWidth: 0,
-        hoverOffset: 6,
-      }],
+      datasets: [{ data: values, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '70%',
+      responsive: true, maintainAspectRatio: false, cutout: '70%',
       plugins: {
         legend: { display: false },
         tooltip: {
-          callbacks: {
-            label: (ctx) => `  ${ctx.label}: ${ctx.raw}m`,
-          },
-          backgroundColor: '#0b0e1a',
-          borderColor: 'rgba(255,255,255,0.08)',
-          borderWidth: 1,
-          titleColor: '#d8dff0',
-          bodyColor: '#8892a4',
-          padding: 10,
+          callbacks: { label: (c) => `  ${c.label}: ${c.raw}m` },
+          backgroundColor: '#0b0e1a', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1,
+          titleColor: '#d8dff0', bodyColor: '#8892a4', padding: 10,
         },
       },
     },
@@ -228,44 +252,28 @@ function buildBarChart(labels, values) {
         data: values,
         backgroundColor: 'rgba(61,125,255,0.7)',
         hoverBackgroundColor: '#3d7dff',
-        borderRadius: 4,
-        borderSkipped: false,
+        borderRadius: 4, borderSkipped: false,
       }],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
-          callbacks: {
-            label: (ctx) => `  ${ctx.raw}m`,
-          },
-          backgroundColor: '#0b0e1a',
-          borderColor: 'rgba(255,255,255,0.08)',
-          borderWidth: 1,
-          titleColor: '#d8dff0',
-          bodyColor: '#8892a4',
-          padding: 10,
+          callbacks: { label: (c) => `  ${c.raw}m` },
+          backgroundColor: '#0b0e1a', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1,
+          titleColor: '#d8dff0', bodyColor: '#8892a4', padding: 10,
         },
       },
       scales: {
-        x: {
-          grid:   { display: false },
-          ticks:  { color: '#4a5368', font: { size: 11 } },
-          border: { color: 'transparent' },
-        },
-        y: {
-          grid:   { color: 'rgba(255,255,255,0.04)' },
-          ticks:  { color: '#4a5368', font: { size: 11 }, callback: (v) => `${v}m` },
-          border: { color: 'transparent' },
-        },
+        x: { grid: { display: false }, ticks: { color: '#4a5368', font: { size: 11 } }, border: { color: 'transparent' } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4a5368', font: { size: 11 }, callback: (v) => `${v}m` }, border: { color: 'transparent' } },
       },
     },
   });
 }
 
-// ─── Legend Panel ─────────────────────────────────────────────────────────────
+// ─── Legend ───────────────────────────────────────────────────────────────────
 
 function renderLegend(sorted) {
   const container = document.getElementById('legendItems');
@@ -277,29 +285,27 @@ function renderLegend(sorted) {
   }
 
   for (const [domain, data] of sorted.slice(0, 10)) {
-    const cat  = snapshotCategories[domain] || 'neutral';
-    const pct  = snapshotTotalMs > 0 ? Math.round((data.total / snapshotTotalMs) * 100) : 0;
-    const color = categoryColor(cat);
-    const icon  = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-
+    const cat = getEffectiveCategory(domain, snapshotCategories);
+    const pct = snapshotTotalMs > 0 ? Math.round((data.total / snapshotTotalMs) * 100) : 0;
+    const icon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
     const row = document.createElement('div');
     row.className = 'legend-row';
     row.innerHTML = `
-      <div class="legend-swatch" style="background:${color}"></div>
+      <div class="legend-swatch" style="background:${categoryColor(cat)}"></div>
       <img src="${icon}" class="legend-favicon" onerror="this.style.display='none'">
-      <span class="legend-domain">${domain}</span>
+      <span class="legend-domain">${esc(domain)}</span>
       <span class="legend-pct">${pct}%</span>
     `;
     container.appendChild(row);
   }
 }
 
-// ─── Domain Table ─────────────────────────────────────────────────────────────
+// ─── Table ────────────────────────────────────────────────────────────────────
 
 function renderTable(sorted) {
   const tbody = document.getElementById('tableBody');
   const query = (document.getElementById('searchInput')?.value ?? '').toLowerCase().trim();
-  const rows  = query ? sorted.filter(([d]) => d.includes(query)) : sorted;
+  const rows = query ? sorted.filter(([d]) => d.includes(query)) : sorted;
 
   tbody.innerHTML = '';
 
@@ -309,10 +315,10 @@ function renderTable(sorted) {
   }
 
   for (const [domain, data] of rows) {
-    const cat    = snapshotCategories[domain] || 'neutral';
-    const pct    = snapshotTotalMs > 0 ? (data.total / snapshotTotalMs) * 100 : 0;
-    const color  = categoryColor(cat);
-    const icon   = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    const cat = getEffectiveCategory(domain, snapshotCategories);
+    const pct = snapshotTotalMs > 0 ? (data.total / snapshotTotalMs) * 100 : 0;
+    const color = categoryColor(cat);
+    const icon = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
 
     const sortedPaths = Object.entries(data.paths || {})
       .filter(([, ms]) => ms > 1000)
@@ -321,21 +327,17 @@ function renderTable(sorted) {
 
     const hasSubPaths = sortedPaths.length > 0;
 
-    let pathHtml = '';
-    if (hasSubPaths) {
-      pathHtml = `<div class="sub-paths">` +
-        sortedPaths.map(([path, ms]) => `
-          <div class="sub-path-row">
-            <span class="sub-path-name">${path}</span>
-            <span class="sub-path-time">${fmtTime(ms)}</span>
-          </div>
-        `).join('') +
-        `</div>`;
-    }
+    const pathHtml = hasSubPaths
+      ? `<div class="sub-paths">${sortedPaths.map(([path, ms]) =>
+        `<div class="sub-path-row">
+             <span class="sub-path-name">${esc(path)}</span>
+             <span class="sub-path-time">${fmtTime(ms)}</span>
+           </div>`
+      ).join('')}</div>`
+      : '';
 
     const tr = document.createElement('tr');
 
-    // Domain cell (details accordion)
     const tdDomain = document.createElement('td');
     tdDomain.className = 'td-domain';
     if (hasSubPaths) {
@@ -343,47 +345,38 @@ function renderTable(sorted) {
         <details>
           <summary>
             <img src="${icon}" class="domain-favicon" onerror="this.style.visibility='hidden'">
-            <span class="domain-name">${domain}</span>
+            <span class="domain-name">${esc(domain)}</span>
             <span class="expand-chevron">›</span>
           </summary>
           ${pathHtml}
-        </details>
-      `;
+        </details>`;
     } else {
       tdDomain.innerHTML = `
         <div style="display:flex;align-items:center;gap:9px;padding:10px 14px">
           <img src="${icon}" class="domain-favicon" onerror="this.style.visibility='hidden'">
-          <span class="domain-name">${domain}</span>
-        </div>
-      `;
+          <span class="domain-name">${esc(domain)}</span>
+        </div>`;
     }
 
-    // Category cell
     const tdCat = document.createElement('td');
     tdCat.className = 'td-cat';
     tdCat.innerHTML = `<span class="badge badge-${cat}">${categoryLabel(cat)}</span>`;
 
-    // Time cell
     const tdTime = document.createElement('td');
     tdTime.className = 'td-time';
     tdTime.textContent = fmtTime(data.total);
 
-    // Share cell
     const tdShare = document.createElement('td');
     tdShare.className = 'td-share';
     tdShare.innerHTML = `
       <div class="share-cell">
         <div class="share-track">
-          <div class="share-fill" style="width:${Math.min(pct, 100)}%;background:${color}"></div>
+          <div class="share-fill" style="width:${Math.min(pct, 100).toFixed(1)}%;background:${color}"></div>
         </div>
         <span class="share-pct">${Math.round(pct)}%</span>
-      </div>
-    `;
+      </div>`;
 
-    tr.appendChild(tdDomain);
-    tr.appendChild(tdCat);
-    tr.appendChild(tdTime);
-    tr.appendChild(tdShare);
+    tr.append(tdDomain, tdCat, tdTime, tdShare);
     tbody.appendChild(tr);
   }
 }
@@ -392,47 +385,51 @@ function renderTable(sorted) {
 
 function exportCSV() {
   const sorted = Object.entries(snapshotDomains).sort(([, a], [, b]) => b.total - a.total);
-  const lines  = [['Domain', 'Category', 'Time (ms)', 'Time'].join(',')];
-
+  const lines = [['Domain', 'Category', 'Time (ms)', 'Time'].join(',')];
   for (const [domain, data] of sorted) {
-    const cat = snapshotCategories[domain] || 'neutral';
+    const cat = getEffectiveCategory(domain, snapshotCategories);
     lines.push([domain, cat, data.total, fmtTime(data.total)].join(','));
   }
-
   const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `time-tracker-${dateKey(currentDate)}.csv`;
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement('a'), { href: url, download: `time-tracker-${dateKey(currentDate)}.csv` });
   a.click();
   URL.revokeObjectURL(url);
 }
 
-// ─── Date Navigation ──────────────────────────────────────────────────────────
+// ─── Navigation ───────────────────────────────────────────────────────────────
 
 function syncDateDisplay() {
   document.getElementById('dateDisplay').textContent = formatDateDisplay(currentDate);
 
   const today = new Date();
-  const atToday =
-    view === 'day'
-      ? dateKey(currentDate) === dateKey(today)
-      : dateKey(getWeekStart(currentDate)) === dateKey(getWeekStart(today));
-
-  document.getElementById('nextBtn').disabled = atToday;
+  let atLimit = false;
+  if (view === 'day') {
+    atLimit = dateKey(currentDate) === dateKey(today);
+  } else if (view === 'week') {
+    atLimit = dateKey(getWeekStart(currentDate)) === dateKey(getWeekStart(today));
+  } else {
+    atLimit = currentDate.getFullYear() === today.getFullYear() &&
+      currentDate.getMonth() === today.getMonth();
+  }
+  document.getElementById('nextBtn').disabled = atLimit;
 }
 
-function navigate(direction) {
-  const delta = view === 'day' ? 1 : 7;
+function navigate(dir) {
   currentDate = new Date(currentDate);
-  currentDate.setDate(currentDate.getDate() + direction * delta);
+  if (view === 'month') {
+    currentDate.setMonth(currentDate.getMonth() + dir);
+  } else if (view === 'week') {
+    currentDate.setDate(currentDate.getDate() + dir * 7);
+  } else {
+    currentDate.setDate(currentDate.getDate() + dir);
+  }
   load();
 }
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-
   // View tabs
   document.querySelectorAll('.view-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -443,13 +440,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Date navigation
   document.getElementById('prevBtn').addEventListener('click', () => navigate(-1));
   document.getElementById('nextBtn').addEventListener('click', () => navigate(1));
 
-  // Calendar picker
   const picker = document.getElementById('datePickerHidden');
-  picker.max   = dateKey(new Date());
+  picker.max = dateKey(new Date());
 
   document.getElementById('calBtn').addEventListener('click', () => {
     picker.value = dateKey(currentDate);
@@ -463,10 +458,8 @@ document.addEventListener('DOMContentLoaded', () => {
     load();
   });
 
-  // Export
   document.getElementById('exportBtn').addEventListener('click', exportCSV);
 
-  // Search
   document.getElementById('searchInput').addEventListener('input', () => {
     const sorted = Object.entries(snapshotDomains).sort(([, a], [, b]) => b.total - a.total);
     renderTable(sorted);

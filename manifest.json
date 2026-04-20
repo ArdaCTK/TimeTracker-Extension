@@ -2,14 +2,14 @@
   "manifest_version": 3,
   "name": "Pro Time Tracker",
   "description": "Track your active browser time with domain analytics, productivity categories, and time limits.",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "permissions": [
     "tabs",
     "storage",
     "alarms",
     "notifications",
     "idle",
-    "favicon"
+    "windows"
   ],
   "background": {
     "service_worker": "background.js"
@@ -26,5 +26,8 @@
     "16": "assets/icon-16.png",
     "48": "assets/icon-48.png",
     "128": "assets/icon-128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "default-src 'self'; img-src 'self' https://www.google.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com"
   }
 }

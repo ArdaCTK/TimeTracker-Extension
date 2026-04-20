@@ -1153,3 +1153,47 @@ details[open] .expand-chevron { transform: rotate(90deg); }
   font-size: 11px;
   color: var(--text-muted);
 }
+
+/* ── Default / Custom category source badges ─────────────────────────── */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.source-badge.default {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.source-badge.user {
+  background: rgba(61, 125, 255, 0.1);
+  color: #3d7dff;
+  border: 1px solid rgba(61, 125, 255, 0.2);
+}
+
+/* ── Reset-to-default button ────────────────────────────────────────────── */
+.btn-row-reset {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.btn-row-reset:hover {
+  background: var(--red-dim);
+  border-color: rgba(255, 95, 87, 0.3);
+  color: var(--red);
+}

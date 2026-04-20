@@ -1,43 +1,40 @@
-// background.js — Pro Time Tracker v3.0
-// Service worker responsible for all time tracking logic.
+// background.js — Pro Time Tracker v3.1
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
-/**
- * Parse a URL into { domain, path }. Returns null for non-http URLs.
- */
+/** Local-date YYYY-MM-DD — FIX: toISOString() returns UTC, which causes date
+ *  mismatch for users in UTC+ timezones (e.g. Turkey = UTC+3 loses 3 hours). */
+function todayKey() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function parseUrl(rawUrl) {
   try {
     const url = new URL(rawUrl);
     if (!url.protocol.startsWith('http')) return null;
-    return {
-      domain: url.hostname,
-      path: url.pathname + url.search,
-    };
+    return { domain: url.hostname, path: url.pathname + url.search };
   } catch {
     return null;
   }
 }
 
-/** Returns today's date string in YYYY-MM-DD format. */
-function todayKey() {
-  return new Date().toISOString().split('T')[0];
-}
+// ─── Flush Mutex — prevents race condition between alarm + tab events ─────────
 
-// ─── Core Tracking Logic ──────────────────────────────────────────────────────
+let _flushing = false;
 
-/**
- * Flush elapsed time from the current tracking session to storage.
- * Resets startTime to now to prevent double-counting on subsequent flushes.
- * Safe to call at any time — exits early if no session is active.
- */
 async function flushTime() {
+  if (_flushing) return;
+  _flushing = true;
   try {
     const { trackingState } = await chrome.storage.local.get('trackingState');
     if (!trackingState?.url || !trackingState?.startTime) return;
 
     const elapsed = Date.now() - trackingState.startTime;
-    if (elapsed < 1000) return; // Ignore sub-second intervals
+    if (elapsed < 500) return; // sub-half-second noise
 
     const parsed = parseUrl(trackingState.url);
     if (!parsed) return;
@@ -54,35 +51,31 @@ async function flushTime() {
     dayData[parsed.domain].paths[parsed.path] =
       (dayData[parsed.domain].paths[parsed.path] || 0) + elapsed;
 
-    // Reset startTime to prevent double-counting on the next flush
+    // Reset startTime to now — prevents double-counting on next flush
     trackingState.startTime = Date.now();
 
     await chrome.storage.local.set({ [key]: dayData, trackingState });
     await checkTimeLimit(parsed.domain, dayData[parsed.domain].total);
   } catch (err) {
     console.error('[Tracker] flushTime:', err);
+  } finally {
+    _flushing = false;
   }
 }
 
-/**
- * Start tracking a new URL. Flushes pending time from the previous session first.
- */
+// ─── Tracking Control ─────────────────────────────────────────────────────────
+
 async function startTracking(url, tabId) {
   await flushTime();
-
   if (url?.startsWith('http')) {
     await chrome.storage.local.set({
       trackingState: { url, tabId, startTime: Date.now() },
     });
   } else {
-    // chrome://, about:, file:// — not tracked
     await chrome.storage.local.set({ trackingState: null });
   }
 }
 
-/**
- * Stop all tracking. Flushes pending time before clearing state.
- */
 async function stopTracking() {
   await flushTime();
   await chrome.storage.local.set({ trackingState: null });
@@ -90,16 +83,10 @@ async function stopTracking() {
 
 // ─── Time Limit Enforcement ───────────────────────────────────────────────────
 
-/**
- * Fire a notification if the user has exceeded their daily limit for a domain.
- * Only notifies once per domain per day.
- */
 async function checkTimeLimit(domain, totalMs) {
   try {
-    const { limits = {}, limitNotified = {} } = await chrome.storage.local.get([
-      'limits',
-      'limitNotified',
-    ]);
+    const { limits = {}, limitNotified = {} } =
+      await chrome.storage.local.get(['limits', 'limitNotified']);
 
     const limitMs = limits[domain];
     if (!limitMs || totalMs < limitMs) return;
@@ -126,7 +113,6 @@ async function checkTimeLimit(domain, totalMs) {
 
 // ─── Event Listeners ──────────────────────────────────────────────────────────
 
-// Mark user as idle after 60 seconds of no input.
 chrome.idle.setDetectionInterval(60);
 
 chrome.idle.onStateChanged.addListener(async (newState) => {
@@ -134,7 +120,6 @@ chrome.idle.onStateChanged.addListener(async (newState) => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab) await startTracking(tab.url, tab.id);
   } else {
-    // 'idle' or 'locked' — pause tracking
     await stopTracking();
   }
 });
@@ -158,28 +143,29 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   const { trackingState } = await chrome.storage.local.get('trackingState');
-  if (trackingState?.tabId === tabId) {
-    await stopTracking();
+  if (trackingState?.tabId === tabId) await stopTracking();
+});
+
+// FIX: Tab replacement (Chrome prerendering / bfcache navigation)
+chrome.tabs.onReplaced.addListener(async (addedTabId, removedTabId) => {
+  const { trackingState } = await chrome.storage.local.get('trackingState');
+  if (trackingState?.tabId === removedTabId) {
+    try {
+      const tab = await chrome.tabs.get(addedTabId);
+      await startTracking(tab.url, addedTabId);
+    } catch (err) {
+      console.error('[Tracker] onReplaced:', err);
+    }
   }
 });
 
-/**
- * FIX: Fullscreen tracking bug.
- *
- * On some platforms and fullscreen modes (e.g. YouTube video fullscreen),
- * Chrome fires onFocusChanged with WINDOW_ID_NONE spuriously — the browser
- * window is still visible and active. We verify by checking if any window
- * actually reports as focused before we stop tracking.
- */
+// FIX: Fullscreen tracking — verify no window is actually focused before pausing
 chrome.windows.onFocusChanged.addListener(async (windowId) => {
   if (windowId === chrome.windows.WINDOW_ID_NONE) {
-    // Verify that no window is actually focused before pausing.
     const windows = await chrome.windows.getAll({ populate: false });
     const hasFocusedWindow = windows.some((w) => w.focused);
-    if (!hasFocusedWindow) {
-      await stopTracking();
-    }
-    // If a window is still focused, the spurious event is ignored.
+    if (!hasFocusedWindow) await stopTracking();
+    // If a window is still focused, this is a spurious event — ignore it.
   } else {
     const [tab] = await chrome.tabs.query({ active: true, windowId });
     if (tab) await startTracking(tab.url, tab.id);
@@ -190,8 +176,6 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'periodicSave') {
-    // Heartbeat flush — prevents time loss during fullscreen, long sessions,
-    // or any edge case where tab/window events don't fire correctly.
     await flushTime();
   } else if (alarm.name === 'dailyReport') {
     await flushTime();
@@ -211,15 +195,16 @@ chrome.notifications.onClicked.addListener(() => {
 
 // ─── Startup / Install ────────────────────────────────────────────────────────
 
-function ensureAlarms() {
-  // Flush time every 30 seconds as a safety net for edge cases.
+async function ensureAlarms() {
+  // Clear first to prevent alarm duplication across restarts
+  await chrome.alarms.clear('periodicSave');
   chrome.alarms.create('periodicSave', { periodInMinutes: 0.5 });
 }
 
 chrome.runtime.onInstalled.addListener(ensureAlarms);
 
 chrome.runtime.onStartup.addListener(async () => {
-  ensureAlarms();
+  await ensureAlarms();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab) await startTracking(tab.url, tab.id);
 });
