@@ -79,16 +79,39 @@ function formatDateDisplay(d) {
   return d.toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+function parseUrl(url) {
+  try {
+    const u = new URL(url);
+    return { domain: u.hostname, path: u.pathname + u.search };
+  } catch {
+    return null;
+  }
+}
+
+function withLiveSession(dayData, trackingState) {
+  const merged = JSON.parse(JSON.stringify(dayData || {}));
+  if (!trackingState?.url || !trackingState?.startTime) return merged;
+
+  const parsed = parseUrl(trackingState.url);
+  if (!parsed) return merged;
+
+  const elapsed = Math.max(0, Date.now() - trackingState.startTime);
+  if (!merged[parsed.domain]) merged[parsed.domain] = { total: 0, paths: {} };
+  merged[parsed.domain].total += elapsed;
+  merged[parsed.domain].paths[parsed.path] = (merged[parsed.domain].paths[parsed.path] || 0) + elapsed;
+  return merged;
+}
+
 // ─── Data Loading ─────────────────────────────────────────────────────────────
 
 async function load() {
-  const { categories = {} } = await chrome.storage.local.get('categories');
+  const { categories = {}, trackingState = null } = await chrome.storage.local.get(['categories', 'trackingState']);
   snapshotCategories = categories;
 
   if (view === 'day') {
     const key = dateKey(currentDate);
     const result = await chrome.storage.local.get(key);
-    renderDay(result[key] || {});
+    renderDay(withLiveSession(result[key] || {}, trackingState));
   } else if (view === 'week') {
     await loadWeek();
   } else {

@@ -22,6 +22,15 @@ function parseDomain(url) {
   try { return new URL(url).hostname; } catch { return null; }
 }
 
+function parseUrl(url) {
+  try {
+    const u = new URL(url);
+    return { domain: u.hostname, path: u.pathname + u.search };
+  } catch {
+    return null;
+  }
+}
+
 // XSS guard — escape before inserting into innerHTML
 function esc(str) {
   return String(str)
@@ -40,6 +49,7 @@ async function render() {
   const dayData = data[today] || {};
   const categories = data.categories || {};
   const state = data.trackingState;
+  const liveDayData = JSON.parse(JSON.stringify(dayData));
 
   // Tracking status pill
   const pill = document.getElementById('statusPill');
@@ -54,7 +64,7 @@ async function render() {
 
   // Aggregate by category
   let totalMs = 0, productiveMs = 0, unproductiveMs = 0;
-  const sorted = Object.entries(dayData).sort(([, a], [, b]) => b.total - a.total);
+  const sorted = Object.entries(liveDayData).sort(([, a], [, b]) => b.total - a.total);
 
   for (const [domain, d] of sorted) {
     totalMs += d.total;
@@ -108,7 +118,7 @@ async function render() {
     const domain = parseDomain(state.url);
     if (domain) {
       nowEl.classList.add('visible');
-      nowDomain.textContent = esc(domain);
+      nowDomain.textContent = domain;
     }
   } else {
     nowEl.classList.remove('visible');
@@ -159,3 +169,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.close();
   });
 });
+  // Include active, unflushed session so UI does not appear stuck.
+  if (state?.url && state?.startTime) {
+    const parsed = parseUrl(state.url);
+    if (parsed) {
+      const elapsed = Math.max(0, Date.now() - state.startTime);
+      if (!liveDayData[parsed.domain]) liveDayData[parsed.domain] = { total: 0, paths: {} };
+      liveDayData[parsed.domain].total += elapsed;
+      liveDayData[parsed.domain].paths[parsed.path] =
+        (liveDayData[parsed.domain].paths[parsed.path] || 0) + elapsed;
+    }
+  }

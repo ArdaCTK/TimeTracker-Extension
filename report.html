@@ -1,23 +1,18 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pro Time Tracker — Dashboard</title>
+  <title>FocusLedger - Dashboard</title>
   <link rel="stylesheet" href="style.css">
   <script src="assets/chart.umd.js"></script>
 </head>
-
 <body class="report-body">
   <div class="report-root">
-
-    <!-- ── Header ─────────────────────────────────────────────────────────────── -->
     <header class="report-header">
-
       <div class="report-logo">
-        <div class="report-logo-icon">⏱</div>
-        Pro Time Tracker
+        <div class="report-logo-icon">FL</div>
+        FocusLedger
       </div>
 
       <div class="view-tabs">
@@ -38,13 +33,9 @@
         <button class="btn-outline" id="exportBtn">Export CSV</button>
         <a href="settings.html" class="icon-btn" title="Settings">⚙</a>
       </div>
-
     </header>
 
-    <!-- ── Main ───────────────────────────────────────────────────────────────── -->
     <main class="report-main">
-
-      <!-- Stats row -->
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-card-label">Total Active Time</div>
@@ -64,24 +55,18 @@
         </div>
       </div>
 
-      <!-- Chart + legend -->
       <div class="chart-section">
-        <div class="chart-card">
-          <canvas id="mainChart"></canvas>
-        </div>
+        <div class="chart-card"><canvas id="mainChart"></canvas></div>
         <div class="legend-panel">
           <div class="legend-panel-title">Breakdown</div>
-          <div class="legend-items" id="legendItems">
-            <div class="legend-empty">No data</div>
-          </div>
+          <div class="legend-items" id="legendItems"><div class="legend-empty">No data</div></div>
         </div>
       </div>
 
-      <!-- Domain table -->
       <div class="table-section">
         <div class="table-toolbar">
           <span class="table-toolbar-title">Usage Breakdown</span>
-          <input type="search" id="searchInput" class="search-input" placeholder="Filter domains…">
+          <input type="search" id="searchInput" class="search-input" placeholder="Filter domains...">
         </div>
         <div class="table-wrap">
           <table class="data-table">
@@ -94,19 +79,15 @@
               </tr>
             </thead>
             <tbody id="tableBody">
-              <tr>
-                <td colspan="4" class="empty-state">No data recorded.</td>
-              </tr>
+              <tr><td colspan="4" class="empty-state">No data recorded.</td></tr>
             </tbody>
           </table>
         </div>
       </div>
-
     </main>
   </div>
   <script src="assets/chart.umd.js"></script>
   <script src="constants.js"></script>
   <script src="report.js"></script>
 </body>
-
 </html>

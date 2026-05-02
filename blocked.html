@@ -1,0 +1,32 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Site Locked</title>
+  <link rel="stylesheet" href="blocked.css">
+</head>
+<body>
+  <main class="lock-shell">
+    <section class="lock-card">
+      <div class="orb" aria-hidden="true"></div>
+      <p class="eyebrow">FocusLedger</p>
+      <h1>Access Locked for Today</h1>
+      <p class="subtitle">
+        You have reached your daily limit for this site. Access will be available again after reset.
+      </p>
+
+      <div class="meta-grid">
+        <div class="meta-item"><span>Domain</span><strong id="domain">-</strong></div>
+        <div class="meta-item"><span>Daily Limit</span><strong id="limit">-</strong></div>
+        <div class="meta-item"><span>Used Time</span><strong id="used">-</strong></div>
+        <div class="meta-item"><span>Date</span><strong id="date">-</strong></div>
+      </div>
+
+      <button id="closeTabBtn" class="close-btn" type="button">Close Tab</button>
+    </section>
+  </main>
+
+  <script src="blocked.js"></script>
+</body>
+</html>

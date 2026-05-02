@@ -1,6 +1,6 @@
-// background.js — Pro Time Tracker v3.1
+﻿// background.js — Pro Time Tracker v3.1
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
+// ——— Utilities ———————————————————————————————————————————————————————————————
 
 /** Local-date YYYY-MM-DD — FIX: toISOString() returns UTC, which causes date
  *  mismatch for users in UTC+ timezones (e.g. Turkey = UTC+3 loses 3 hours). */
@@ -22,7 +22,66 @@ function parseUrl(rawUrl) {
   }
 }
 
-// ─── Flush Mutex — prevents race condition between alarm + tab events ─────────
+function isBlockedPage(url) {
+  return typeof url === 'string' && url.startsWith(chrome.runtime.getURL('blocked.html'));
+}
+
+function formatDuration(ms) {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60000));
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+async function getTodayDomainTotal(domain) {
+  const key = todayKey();
+  const stored = await chrome.storage.local.get(key);
+  const dayData = stored[key] || {};
+  return dayData[domain]?.total || 0;
+}
+
+async function isDomainLocked(domain) {
+  const [{ limits = {}, autoBlockEnabled = false }, total] = await Promise.all([
+    chrome.storage.local.get(['limits', 'autoBlockEnabled']),
+    getTodayDomainTotal(domain),
+  ]);
+
+  if (!autoBlockEnabled) return null;
+
+  const limitMs = limits[domain];
+  if (!limitMs) return null;
+  if (total < limitMs) return null;
+
+  return { limitMs, totalMs: total };
+}
+
+async function redirectToBlockedPage(tabId, domain, totalMs, limitMs) {
+  const params = new URLSearchParams({
+    domain,
+    used: formatDuration(totalMs),
+    limit: formatDuration(limitMs),
+    date: todayKey(),
+  });
+
+  await chrome.tabs.update(tabId, {
+    url: `${chrome.runtime.getURL('blocked.html')}?${params.toString()}`,
+  });
+}
+
+async function enforceBlockForTab(tabId, url) {
+  if (!url || isBlockedPage(url)) return false;
+
+  const parsed = parseUrl(url);
+  if (!parsed) return false;
+
+  const lockInfo = await isDomainLocked(parsed.domain);
+  if (!lockInfo) return false;
+
+  await redirectToBlockedPage(tabId, parsed.domain, lockInfo.totalMs, lockInfo.limitMs);
+  return true;
+}
+
+// ——— Flush Mutex — prevents race condition between alarm + tab events —————————
 
 let _flushing = false;
 
@@ -55,7 +114,7 @@ async function flushTime() {
     trackingState.startTime = Date.now();
 
     await chrome.storage.local.set({ [key]: dayData, trackingState });
-    await checkTimeLimit(parsed.domain, dayData[parsed.domain].total);
+    await checkTimeLimit(parsed.domain, dayData[parsed.domain].total, trackingState.tabId);
   } catch (err) {
     console.error('[Tracker] flushTime:', err);
   } finally {
@@ -63,10 +122,17 @@ async function flushTime() {
   }
 }
 
-// ─── Tracking Control ─────────────────────────────────────────────────────────
+// ——— Tracking Control —————————————————————————————————————————————————————————
 
 async function startTracking(url, tabId) {
   await flushTime();
+
+  const blocked = await enforceBlockForTab(tabId, url);
+  if (blocked) {
+    await chrome.storage.local.set({ trackingState: null });
+    return;
+  }
+
   if (url?.startsWith('http')) {
     await chrome.storage.local.set({
       trackingState: { url, tabId, startTime: Date.now() },
@@ -81,37 +147,58 @@ async function stopTracking() {
   await chrome.storage.local.set({ trackingState: null });
 }
 
-// ─── Time Limit Enforcement ───────────────────────────────────────────────────
-
-async function checkTimeLimit(domain, totalMs) {
+async function reconcileActiveTabTracking() {
   try {
-    const { limits = {}, limitNotified = {} } =
-      await chrome.storage.local.get(['limits', 'limitNotified']);
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) return;
+
+    const { trackingState } = await chrome.storage.local.get('trackingState');
+    if (!trackingState || trackingState.tabId !== tab.id || trackingState.url !== tab.url) {
+      await startTracking(tab.url, tab.id);
+    }
+  } catch (err) {
+    console.error('[Tracker] reconcileActiveTabTracking:', err);
+  }
+}
+
+// ——— Time Limit Enforcement ———————————————————————————————————————————————————
+
+async function checkTimeLimit(domain, totalMs, currentTabId) {
+  try {
+    const { limits = {}, limitNotified = {}, autoBlockEnabled = false } =
+      await chrome.storage.local.get(['limits', 'limitNotified', 'autoBlockEnabled']);
 
     const limitMs = limits[domain];
     if (!limitMs || totalMs < limitMs) return;
 
     const today = todayKey();
     const notifiedToday = limitNotified[today] || [];
-    if (notifiedToday.includes(domain)) return;
 
-    chrome.notifications.create(`limit:${domain}`, {
-      type: 'basic',
-      iconUrl: 'assets/icon-128.png',
-      title: 'Daily Time Limit Reached',
-      message: `You've hit your daily limit for ${domain}.`,
-      priority: 2,
-    });
+    if (!notifiedToday.includes(domain)) {
+      chrome.notifications.create(`limit:${domain}`, {
+        type: 'basic',
+        iconUrl: 'assets/icon-128.png',
+        title: 'Daily Time Limit Reached',
+        message: autoBlockEnabled
+          ? `You hit your daily limit for ${domain}. This site is now locked for today.`
+          : `You hit your daily limit for ${domain}.`,
+        priority: 2,
+      });
 
-    notifiedToday.push(domain);
-    limitNotified[today] = notifiedToday;
-    await chrome.storage.local.set({ limitNotified });
+      notifiedToday.push(domain);
+      limitNotified[today] = notifiedToday;
+      await chrome.storage.local.set({ limitNotified });
+    }
+
+    if (autoBlockEnabled && Number.isInteger(currentTabId)) {
+      await redirectToBlockedPage(currentTabId, domain, totalMs, limitMs);
+    }
   } catch (err) {
     console.error('[Tracker] checkTimeLimit:', err);
   }
 }
 
-// ─── Event Listeners ──────────────────────────────────────────────────────────
+// ——— Event Listeners ——————————————————————————————————————————————————————————
 
 chrome.idle.setDetectionInterval(60);
 
@@ -138,7 +225,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   const { trackingState } = await chrome.storage.local.get('trackingState');
   if (trackingState?.tabId === tabId) {
     await startTracking(changeInfo.url, tabId);
+    return;
   }
+
+  await enforceBlockForTab(tabId, changeInfo.url);
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
@@ -172,10 +262,11 @@ chrome.windows.onFocusChanged.addListener(async (windowId) => {
   }
 });
 
-// ─── Alarms ───────────────────────────────────────────────────────────────────
+// ——— Alarms ————————————————————————————————————————————————————————————————————
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'periodicSave') {
+    await reconcileActiveTabTracking();
     await flushTime();
   } else if (alarm.name === 'dailyReport') {
     await flushTime();
@@ -193,7 +284,7 @@ chrome.notifications.onClicked.addListener(() => {
   chrome.tabs.create({ url: 'report.html' });
 });
 
-// ─── Startup / Install ────────────────────────────────────────────────────────
+// ——— Startup / Install ———————————————————————————————————————————————————————
 
 async function ensureAlarms() {
   // Clear first to prevent alarm duplication across restarts
@@ -205,6 +296,7 @@ chrome.runtime.onInstalled.addListener(ensureAlarms);
 
 chrome.runtime.onStartup.addListener(async () => {
   await ensureAlarms();
+  await reconcileActiveTabTracking();
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (tab) await startTracking(tab.url, tab.id);
 });

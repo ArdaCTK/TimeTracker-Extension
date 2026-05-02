@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Pro Time Tracker",
-  "description": "Track your active browser time with domain analytics, productivity categories, and time limits.",
+  "name": "FocusLedger",
+  "description": "Track active browser time with domain analytics, productivity categories, and optional time blocking.",
   "version": "3.1.0",
   "permissions": [
     "tabs",

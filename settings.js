@@ -212,12 +212,18 @@ function downloadBlob(blob, filename) {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const [domains, { categories = {}, limits = {} }] = await Promise.all([
+  const [domains, { categories = {}, limits = {}, autoBlockEnabled = false }] = await Promise.all([
     collectDomains(60),
-    chrome.storage.local.get(['categories', 'limits']),
+    chrome.storage.local.get(['categories', 'limits', 'autoBlockEnabled']),
   ]);
 
   renderCategoryTable(domains, categories, limits);
+
+  const autoBlockToggle = document.getElementById('autoBlockEnabled');
+  autoBlockToggle.checked = Boolean(autoBlockEnabled);
+  autoBlockToggle.addEventListener('change', async () => {
+    await chrome.storage.local.set({ autoBlockEnabled: autoBlockToggle.checked });
+  });
 
   document.getElementById('exportJsonBtn').addEventListener('click', exportAllJSON);
   document.getElementById('exportMonthBtn').addEventListener('click', exportMonthCSV);
@@ -229,11 +235,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     );
     if (!confirmed) return;
 
-    const { categories: c, limits: l, reportTime: r } =
-      await chrome.storage.local.get(['categories', 'limits', 'reportTime']);
+    const { categories: c, limits: l, reportTime: r, autoBlockEnabled: abe } =
+      await chrome.storage.local.get(['categories', 'limits', 'reportTime', 'autoBlockEnabled']);
     await chrome.storage.local.clear();
     await chrome.storage.local.set({
-      categories: c || {}, limits: l || {}, reportTime: r || '',
+      categories: c || {}, limits: l || {}, reportTime: r || '', autoBlockEnabled: Boolean(abe),
     });
 
     alert('All tracking data has been cleared. Settings preserved.');

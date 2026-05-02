@@ -1,15 +1,13 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pro Time Tracker — Settings</title>
+  <title>FocusLedger - Settings</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="report-body">
 <div class="report-root">
-
-  <!-- Header -->
   <header class="report-header">
     <a href="report.html" class="back-link">← Dashboard</a>
     <span class="settings-header-title">Settings</span>
@@ -17,14 +15,22 @@
   </header>
 
   <main class="report-main settings-main">
-
-    <!-- ── Domain Categories & Limits ────────────────────────────────────────── -->
     <div class="settings-card">
       <div class="settings-card-header">
         <div class="settings-card-title">Domain Categories &amp; Time Limits</div>
         <div class="settings-card-desc">
-          Tag domains to measure productive vs. unproductive time. Set daily limits to receive notifications.
+          Tag domains to measure productive vs. unproductive time. Set daily limits for notifications and optional blocking.
         </div>
+      </div>
+      <div class="data-row-item">
+        <div>
+          <div class="data-row-label">Lock sites when limits are reached</div>
+          <div class="data-row-desc">When enabled, a site is blocked automatically after its daily limit is reached.</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="autoBlockEnabled">
+          <span class="switch-slider"></span>
+        </label>
       </div>
       <div class="settings-table">
         <table class="data-table">
@@ -38,16 +44,13 @@
           </thead>
           <tbody id="categoryBody">
             <tr>
-              <td colspan="4" class="empty-state">
-                No domains tracked yet. Browse the web for a bit first.
-              </td>
+              <td colspan="4" class="empty-state">No domains tracked yet. Browse the web for a bit first.</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- ── Data Management ───────────────────────────────────────────────────── -->
     <div class="settings-card">
       <div class="settings-card-header">
         <div class="settings-card-title">Data Management</div>
@@ -79,19 +82,17 @@
       </div>
     </div>
 
-    <!-- ── About ─────────────────────────────────────────────────────────────── -->
     <div class="settings-card">
       <div class="settings-card-header">
         <div class="settings-card-title">About</div>
       </div>
       <div class="data-row-item">
         <div>
-          <div class="data-row-label">Pro Time Tracker</div>
-          <div class="data-row-desc">Version 3.0.0 · Privacy-first browser time tracking · All data stays on your device.</div>
+          <div class="data-row-label">FocusLedger</div>
+          <div class="data-row-desc">Version 3.1.0 · Privacy-first browser time tracking · All data stays on your device.</div>
         </div>
       </div>
     </div>
-
   </main>
 </div>
 <script src="constants.js"></script>
